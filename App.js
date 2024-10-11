@@ -8,6 +8,7 @@ import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import BottomTab from './src/navigation/BottomTab';
 import HomeScreen from './src/screens/HomeScreen';
 import { db } from './firebaseConfig';
+import DetailScreen from './src/screens/DetailScreen';
 
 const Stack = createStackNavigator();
 
@@ -19,6 +20,8 @@ const App = () => {
         <Stack.Screen name="LoginScreen" component={LoginScreen} />
         <Stack.Screen name="SigninScreen" component={SigninScreen} />
         <Stack.Screen name="ForgotPasswordScreen" component={ForgotPasswordScreen} />
+        <Stack.Screen name="DetailScreen" component={DetailScreen} />
+
         <Stack.Screen name="HomeScreen" component={BottomTab} /> 
       </Stack.Navigator>
     </NavigationContainer>
