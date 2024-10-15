@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import Icon from 'react-native-vector-icons/FontAwesome'; // Sử dụng thư viện Icon
+import Icon from 'react-native-vector-icons/FontAwesome';
 
 const FavoriteScreen = () => {
     const [loading, setLoading] = useState(true);
@@ -10,7 +10,7 @@ const FavoriteScreen = () => {
     useEffect(() => {
         const subscriber = firestore()
             .collection('Yard')
-            .where('Favorite', '==', true) // Lấy danh sách sân yêu thích
+            .where('Favorite', '==', true)
             .onSnapshot(querySnapshot => {
                 const favoriteYards = [];
                 querySnapshot.forEach(documentSnapshot => {
@@ -30,21 +30,34 @@ const FavoriteScreen = () => {
     }, []);
 
     const handleFavoriteToggle = async (item) => {
-        const updatedFavoriteStatus = !item.Favorite; // Đảo ngược trạng thái yêu thích
+        const updatedFavoriteStatus = !item.Favorite;
 
         try {
             await firestore()
                 .collection('Yard')
                 .doc(item.key)
-                .update({ Favorite: updatedFavoriteStatus }); // Cập nhật trạng thái "Favorite" trong Firestore
+                .update({ Favorite: updatedFavoriteStatus });
 
-            // Cập nhật lại danh sách sân yêu thích sau khi trạng thái thay đổi
+            // Cập nhật trạng thái yêu thích của item
             setFavorites(prevFavorites => 
-                prevFavorites.filter(favorite => favorite.key !== item.key)
+                prevFavorites.map(favorite => 
+                    favorite.key === item.key ? { ...favorite, Favorite: updatedFavoriteStatus } : favorite
+                )
             );
         } catch (error) {
             console.log('Error updating favorite status: ', error);
         }
+    };
+
+    const handleView = (item) => {
+        // Thêm xử lý sự kiện khi nhấn vào sân
+        console.log('View details for: ', item.Name);
+    };
+
+    const handleBook = (item) => {
+        // Thêm xử lý sự kiện khi nhấn vào nút "Đặt sân"
+        console.log('Order yard: ', item.Name);
+        
     };
 
     if (loading) {
@@ -60,18 +73,24 @@ const FavoriteScreen = () => {
                         <View style={styles.itemContainer}>
                             <Image source={{ uri: item.Image }} style={styles.image} />
                             <View style={styles.textContainer}>
-                                <Text style={styles.name}>{item.Name}</Text>
-                                <Text style={styles.address}>{item.Address}</Text>
+                                <TouchableOpacity style={styles.detailButton} onPress={() => handleView(item)}>
+                                    <Text style={styles.name}>{item.Name}</Text>
+                                    <Text style={styles.address}>{item.Address}</Text>
+                                </TouchableOpacity>
+                                
+                                <TouchableOpacity style={styles.orderButton} onPress={() => handleBook(item)}>
+                                    <Text style={styles.detailButtonText}>Đặt sân</Text>
+                                </TouchableOpacity>
                             </View>
 
                             <TouchableOpacity 
                                 style={styles.favoriteButton} 
-                                onPress={() => handleFavoriteToggle(item)} // Xử lý khi nhấn vào nút "tym"
+                                onPress={() => handleFavoriteToggle(item)}
                             >
                                 <Icon 
-                                    name={item.Favorite ? "heart" : "heart-o"} // Hiển thị "heart" nếu là yêu thích, "heart-o" nếu không
+                                    name={item.Favorite ? "heart" : "heart-o"} 
                                     size={24} 
-                                    color={item.Favorite ? "red" : "black"} 
+                                    color={item.Favorite ? 'red' : 'black'} 
                                 />
                             </TouchableOpacity>
                         </View>
@@ -79,7 +98,7 @@ const FavoriteScreen = () => {
                     keyExtractor={item => item.key}
                 />
             ) : (
-                <Text>Không có sân yêu thích nào.</Text>
+                <Text style={styles.noYardText}>Không có sân yêu thích nào.</Text>
             )}
         </View>
     );
@@ -91,12 +110,6 @@ const styles = StyleSheet.create({
         padding: 20,
         backgroundColor: '#49A65A',
     },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#fff',
-        marginBottom: 10,
-    },
     itemContainer: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -107,6 +120,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#ddd',
         marginHorizontal: 5,
+        position: 'relative',
     },
     image: {
         width: 50,
@@ -116,8 +130,6 @@ const styles = StyleSheet.create({
     },
     textContainer: {
         flex: 1,
-        flexDirection: 'column',
-        justifyContent: 'center',
     },
     name: {
         fontSize: 16,
@@ -128,10 +140,25 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#333',
     },
-    favoriteButton: {
-        justifyContent: 'center',
-        alignItems: 'center',
+    orderButton: {
+        backgroundColor: '#FDF8B1',
+        borderRadius: 5,
         padding: 10,
+        marginTop: 5,
+    },
+    detailButtonText: {
+        color: '#5314E6',
+        fontSize: 16,
+        textAlign: 'center',
+    },
+    favoriteButton: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+    },
+    noYardText: {
+        textAlign: 'center',
+        color: '#fff',
     },
 });
 

@@ -8,12 +8,12 @@ const LoginScreen = ({ navigation }) => {
   const [phoneOrEmail, setPhoneOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // Trạng thái để hiển thị hoặc ẩn mật khẩu
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const subscriber = auth().onAuthStateChanged((user) => {
       if (user) {
-        navigation.replace('HomeScreen'); // Nếu người dùng đã đăng nhập, điều hướng về Home
+        navigation.replace('HomeScreen');
       }
       if (initializing) setInitializing(false);
     });
@@ -23,26 +23,33 @@ const LoginScreen = ({ navigation }) => {
   if (initializing) return null;
 
   const login = () => {
+    // Kiểm tra nếu trường nhập liệu trống
     if (!phoneOrEmail || !password) {
       setErrorMessage('Vui lòng nhập số điện thoại hoặc email và mật khẩu!');
       return;
     }
 
+    // Đăng nhập
     auth()
       .signInWithEmailAndPassword(phoneOrEmail, password)
       .then(() => {
         console.log('User signed in!');
-        navigation.navigate('HomeScreen');
+        navigation.navigate('ProfileScreen');
       })
       .catch((error) => {
-        if (error.code === 'auth/invalid-email') {
-          setErrorMessage('Email không hợp lệ!');
-        } else if (error.code === 'auth/wrong-password') {
-          setErrorMessage('Mật khẩu không đúng!');
-        } else if (error.code === 'auth/user-not-found') {
-          setErrorMessage('Tài khoản không tồn tại!');
-        } else {
-          setErrorMessage('Đăng nhập thất bại! Vui lòng thử lại.');
+        switch (error.code) {
+          case 'auth/invalid-email':
+            setErrorMessage('Email không hợp lệ!');
+            break;
+          case 'auth/wrong-password':
+            setErrorMessage('Mật khẩu không đúng!');
+            break;
+          case 'auth/user-not-found':
+            setErrorMessage('Tài khoản không tồn tại!');
+            break;
+          default:
+            setErrorMessage('Đăng nhập thất bại! Vui lòng thử lại.');
+            break;
         }
       });
   };
@@ -53,7 +60,7 @@ const LoginScreen = ({ navigation }) => {
       style={styles.container}
     >
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Icon name="chevron-left" size={20} color="black" />
+        <Icon name="angle-left" size={20} color="black" />
       </TouchableOpacity>
 
       <View style={styles.innerContainer}>
@@ -72,7 +79,7 @@ const LoginScreen = ({ navigation }) => {
           <TextInput
             style={styles.inputPassword}
             placeholder="Mật khẩu"
-            secureTextEntry={!showPassword} // Nếu `showPassword` là false, mật khẩu sẽ được ẩn
+            secureTextEntry={!showPassword}
             value={password}
             onChangeText={(text) => setPassword(text)}
           />
@@ -81,7 +88,7 @@ const LoginScreen = ({ navigation }) => {
             onPress={() => setShowPassword(!showPassword)}
           >
             <Icon
-              name={showPassword ? 'eye-slash' : 'eye'} // Biểu tượng thay đổi dựa trên trạng thái
+              name={showPassword ? 'eye-slash' : 'eye'}
               size={20}
               color="#333"
             />

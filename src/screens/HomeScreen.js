@@ -40,7 +40,9 @@ const HomeScreen = ({ navigation }) => {
   const handleView = (item) => {
     navigation.navigate('DetailScreen', { yard: item });
   };
-
+const handleBook= (item)=>{
+  navigation.navigate('BookingScreen', { yard: item });
+}
   const handleFavorite = async (item) => {
     const updatedFavoriteStatus = !item.Favorite;
 
@@ -99,12 +101,13 @@ const HomeScreen = ({ navigation }) => {
                       <Text style={styles.address}>{item.Address}</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.orderButton}>
-                      <Text style={styles.detailButtonText}>Đặt sân</Text>
-                    </TouchableOpacity>
+                    {/* Nút Đặt Sân */}
+        <TouchableOpacity style={styles.orderButton} onPress={() => handleBook(item)}>
+          <Text style={styles.detailButtonText}>Đặt sân</Text>
+        </TouchableOpacity>
                   </View>
                   <TouchableOpacity style={styles.favoriteButton} onPress={() => handleFavorite(item)}>
-                    <Icon name="heart" size={24} color={item.Favorite ? 'red' : 'black'} />
+                    <Icon name="heart" size={24} color={item.Favorite ? 'red' : 'white'} />
                   </TouchableOpacity>
                 </View>
               )}

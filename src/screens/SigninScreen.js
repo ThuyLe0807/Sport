@@ -1,22 +1,69 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import firestore from '@react-native-firebase/firestore';
+import auth from '@react-native-firebase/auth';
 
 const SigninScreen = ({ navigation }) => {
-  const [phoneEmail, setPhoneEmail] = useState('');
+  const [user, setUser] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState(''); // Separate state for confirming the password
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
 
-  // Simple form validation (for demo)
-  const handleSignup = () => {
+  useEffect(() => {
+    const subscriber = firestore()
+      .collection('User')
+      .onSnapshot(
+        querySnapshot => {
+          if (querySnapshot && !querySnapshot.empty) {
+            const users = [];
+            querySnapshot.forEach(documentSnapshot => {
+              users.push({
+                ...documentSnapshot.data(),
+                key: documentSnapshot.id,
+              });
+            });
+            setUser(users);
+          } else {
+            console.log('No user found');
+          }
+          setLoading(false);
+        },
+        error => {
+          console.log('Error fetching data: ', error);
+          setLoading(false);
+        }
+      );
+
+    return () => subscriber();
+  }, []);
+
+  const handleSignup = async () => {
     if (password !== confirmPassword) {
       alert('Mật khẩu và xác nhận mật khẩu không khớp!');
       return;
     }
-    // Further form validation and signup logic here
-    alert('Đăng ký thành công!');
-    navigation.navigate('LoginScreen'); // Navigate to the login screen after successful registration
+
+    try {
+      // Tạo người dùng mới với email và mật khẩu
+      const userCredential = await auth().createUserWithEmailAndPassword(email, password);
+
+      // Lưu thông tin người dùng vào Firestore
+      await firestore().collection('User').doc(userCredential.user.uid).set({
+        phone,
+        name,
+        email,
+      });
+
+      alert('Đăng ký thành công!');
+      navigation.navigate('LoginScreen'); // Chuyển hướng đến màn hình đăng nhập
+    } catch (error) {
+      console.error('Đăng ký thất bại: ', error);
+      alert('Đăng ký thất bại, vui lòng kiểm tra lại thông tin!');
+    }
   };
 
   return (
@@ -25,7 +72,7 @@ const SigninScreen = ({ navigation }) => {
       style={styles.container}
     >
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Icon name="chevron-left" size={20} color="black" />
+        <Icon name="angle-left" size={20} color="black" />
       </TouchableOpacity>
 
       <View style={styles.innerContainer}>
@@ -33,15 +80,21 @@ const SigninScreen = ({ navigation }) => {
 
         <TextInput
           style={styles.input}
-          placeholder="Số điện thoại hoặc email"
-          value={phoneEmail}
-          onChangeText={(text) => setPhoneEmail(text)}
+          placeholder="Số điện thoại"
+          value={phone}
+          onChangeText={(text) => setPhone(text)}
         />
         <TextInput
           style={styles.input}
           placeholder="Họ và tên"
           value={name}
           onChangeText={(text) => setName(text)}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          value={email}
+          onChangeText={(text) => setEmail(text)}
         />
         <TextInput
           style={styles.input}
@@ -169,6 +222,11 @@ const styles = StyleSheet.create({
     color: '#FF6347',
     marginLeft: 5,
     fontWeight: 'bold',
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 10,
+    textAlign: 'center',
   },
 });
 
