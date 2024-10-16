@@ -94,8 +94,8 @@ const FavoriteScreen = ({ navigation }) => { // Thêm navigation vào props
     };
 
     const handleBook = (item) => {
-        console.log('Order yard: ', item.Name);
-    };
+        navigation.navigate('BookingScreen', { yard: item });
+      };
 
     if (loading) {
         return <ActivityIndicator size="large" color="#0000ff" />;
