@@ -1,15 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, ScrollView, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Linking, PermissionsAndroid } from 'react-native';
 import Section from '../components/Section'; 
 import firestore from '@react-native-firebase/firestore';
+import Geolocation from 'react-native-geolocation-service';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
 const HomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [yard, setYard] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentLocation, setCurrentLocation] = useState(null); // To store the user's current location
 
   useEffect(() => {
+    // Request permission and get current location
+    const requestLocationPermission = async () => {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: "Location Permission",
+            message: "This app needs access to your location to find nearby yards.",
+            buttonNeutral: "Ask Me Later",
+            buttonNegative: "Cancel",
+            buttonPositive: "OK"
+          }
+        );
+        
+        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+          Geolocation.getCurrentPosition(
+            (position) => {
+              const { latitude, longitude } = position.coords;
+              setCurrentLocation({ latitude, longitude });
+            },
+            (error) => {
+              console.log(error.code, error.message);
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+          );
+        } else {
+          console.log("Location permission denied");
+        }
+      } catch (err) {
+        console.warn(err);
+      }
+    };
+
+    requestLocationPermission();
+
     const subscriber = firestore()
       .collection('Yard')
       .onSnapshot(
@@ -40,9 +77,11 @@ const HomeScreen = ({ navigation }) => {
   const handleView = (item) => {
     navigation.navigate('DetailScreen', { yard: item });
   };
-const handleBook= (item)=>{
-  navigation.navigate('BookingScreen', { yard: item });
-}
+
+  const handleBook = (item) => {
+    navigation.navigate('BookingScreen', { yard: item });
+  };
+
   const handleFavorite = async (item) => {
     const updatedFavoriteStatus = !item.Favorite;
 
@@ -66,6 +105,11 @@ const handleBook= (item)=>{
     navigation.navigate('FavoriteScreen');
   };
 
+  const handleOpenMap = (Latitude, Longitude) => {
+    const url = `https://www.google.com/maps/search/?api=1&query=${Latitude},${Longitude}`;
+    Linking.openURL(url);
+  };
+
   if (loading) {
     return <ActivityIndicator size="large" color="#0000ff" />;
   }
@@ -84,6 +128,7 @@ const handleBook= (item)=>{
           onChangeText={setSearchQuery}
         />
         <TouchableOpacity onPress={handleNavigateToFavorite}>
+          <Icon name="heart" size={24} color="white" />
         </TouchableOpacity>
       </View>
 
@@ -98,13 +143,15 @@ const handleBook= (item)=>{
                   <View style={styles.textContainer}>
                     <TouchableOpacity style={styles.detailButton} onPress={() => handleView(item)}>
                       <Text style={styles.name}>{item.Name}</Text>
-                      <Text style={styles.address}>{item.Address}</Text>
+                      <TouchableOpacity onPress={() => handleOpenMap(item.Latitude, item.Longitude)}>
+                        <Text style={styles.address}>{item.Address}</Text>
+                      </TouchableOpacity>
                     </TouchableOpacity>
 
                     {/* Nút Đặt Sân */}
-        <TouchableOpacity style={styles.orderButton} onPress={() => handleBook(item)}>
-          <Text style={styles.detailButtonText}>Đặt sân</Text>
-        </TouchableOpacity>
+                    <TouchableOpacity style={styles.orderButton} onPress={() => handleBook(item)}>
+                      <Text style={styles.detailButtonText}>Đặt sân</Text>
+                    </TouchableOpacity>
                   </View>
                   <TouchableOpacity style={styles.favoriteButton} onPress={() => handleFavorite(item)}>
                     <Icon name="heart" size={24} color={item.Favorite ? 'red' : 'white'} />
@@ -141,11 +188,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     flex: 1,
     marginRight: 10,
-  },
-  favoriteScreenButton: {
-    color: 'white',
-    fontSize: 16,
-    alignSelf: 'center',
   },
   itemContainer: {
     flexDirection: 'row',
@@ -198,4 +240,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeScreen;
+export default HomeScreen;   
