@@ -217,6 +217,8 @@ const styles = StyleSheet.create({
   address: {
     fontSize: 14,
     color: '#333',
+    textDecorationLine: 'underline', // Gạch chân
+    fontStyle: 'italic', // In nghiêng
   },
   orderButton: {
     backgroundColor: '#FDF8B1',

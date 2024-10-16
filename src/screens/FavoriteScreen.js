@@ -1,14 +1,48 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, TouchableOpacity, Linking, PermissionsAndroid } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import Geolocation from 'react-native-geolocation-service';
 
-const FavoriteScreen = () => {
+const FavoriteScreen = ({ navigation }) => { // Thêm navigation vào props
     const [loading, setLoading] = useState(true);
     const [favorites, setFavorites] = useState([]);
+    const [currentLocation, setCurrentLocation] = useState(null);
 
     useEffect(() => {
-        const subscriber = firestore()
+        const requestLocationPermission = async () => {
+            try {
+                const granted = await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+                    {
+                        title: "Location Permission",
+                        message: "This app needs access to your location to find nearby yards.",
+                        buttonNeutral: "Ask Me Later",
+                        buttonNegative: "Cancel",
+                        buttonPositive: "OK"
+                    }
+                );
+
+                if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+                    Geolocation.getCurrentPosition(
+                        (position) => {
+                            const { latitude, longitude } = position.coords;
+                            setCurrentLocation({ latitude, longitude });
+                        },
+                        (error) => {
+                            console.error("Error getting location: ", error.message);
+                        },
+                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+                    );
+                } else {
+                    console.log("Location permission denied");
+                }
+            } catch (err) {
+                console.warn(err);
+            }
+        };
+
+        const unsubscribe = firestore()
             .collection('Yard')
             .where('Favorite', '==', true)
             .onSnapshot(querySnapshot => {
@@ -22,11 +56,13 @@ const FavoriteScreen = () => {
                 setFavorites(favoriteYards);
                 setLoading(false);
             }, error => {
-                console.log('Error fetching favorite yards: ', error);
+                console.error('Error fetching favorite yards: ', error);
                 setLoading(false);
             });
 
-        return () => subscriber();
+        requestLocationPermission();
+
+        return () => unsubscribe(); // Hủy đăng ký khi component unmount
     }, []);
 
     const handleFavoriteToggle = async (item) => {
@@ -38,26 +74,27 @@ const FavoriteScreen = () => {
                 .doc(item.key)
                 .update({ Favorite: updatedFavoriteStatus });
 
-            // Cập nhật trạng thái yêu thích của item
-            setFavorites(prevFavorites => 
-                prevFavorites.map(favorite => 
+            setFavorites(prevFavorites =>
+                prevFavorites.map(favorite =>
                     favorite.key === item.key ? { ...favorite, Favorite: updatedFavoriteStatus } : favorite
                 )
             );
         } catch (error) {
-            console.log('Error updating favorite status: ', error);
+            console.error('Error updating favorite status: ', error);
         }
     };
 
     const handleView = (item) => {
-        // Thêm xử lý sự kiện khi nhấn vào sân
-        console.log('View details for: ', item.Name);
+        navigation.navigate('DetailScreen', { yard: item });
+    };
+
+    const handleOpenMap = (latitude, longitude) => {
+        const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+        Linking.openURL(url);
     };
 
     const handleBook = (item) => {
-        // Thêm xử lý sự kiện khi nhấn vào nút "Đặt sân"
         console.log('Order yard: ', item.Name);
-        
     };
 
     if (loading) {
@@ -75,22 +112,24 @@ const FavoriteScreen = () => {
                             <View style={styles.textContainer}>
                                 <TouchableOpacity style={styles.detailButton} onPress={() => handleView(item)}>
                                     <Text style={styles.name}>{item.Name}</Text>
-                                    <Text style={styles.address}>{item.Address}</Text>
+                                    <TouchableOpacity onPress={() => handleOpenMap(item.Latitude, item.Longitude)}>
+                                        <Text style={styles.address}>{item.Address}</Text>
+                                    </TouchableOpacity>
                                 </TouchableOpacity>
-                                
+
                                 <TouchableOpacity style={styles.orderButton} onPress={() => handleBook(item)}>
                                     <Text style={styles.detailButtonText}>Đặt sân</Text>
                                 </TouchableOpacity>
                             </View>
 
-                            <TouchableOpacity 
-                                style={styles.favoriteButton} 
+                            <TouchableOpacity
+                                style={styles.favoriteButton}
                                 onPress={() => handleFavoriteToggle(item)}
                             >
-                                <Icon 
-                                    name={item.Favorite ? "heart" : "heart-o"} 
-                                    size={24} 
-                                    color={item.Favorite ? 'red' : 'black'} 
+                                <Icon
+                                    name={item.Favorite ? "heart" : "heart-o"}
+                                    size={24}
+                                    color={item.Favorite ? 'red' : 'black'}
                                 />
                             </TouchableOpacity>
                         </View>
@@ -139,6 +178,8 @@ const styles = StyleSheet.create({
     address: {
         fontSize: 14,
         color: '#333',
+        textDecorationLine: 'underline', // Gạch chân
+        fontStyle: 'italic', // In nghiêng
     },
     orderButton: {
         backgroundColor: '#FDF8B1',
