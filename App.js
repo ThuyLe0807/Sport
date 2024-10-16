@@ -10,6 +10,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import { db } from './firebaseConfig';
 import DetailScreen from './src/screens/DetailScreen';
 import BookingScreen from './src/screens/BookingScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 
 const Stack = createStackNavigator();
 
@@ -23,8 +24,9 @@ const App = () => {
         <Stack.Screen name="ForgotPasswordScreen" component={ForgotPasswordScreen} />
         <Stack.Screen name="DetailScreen" component={DetailScreen} />
         <Stack.Screen name="BookingScreen" component={BookingScreen} />
+        <Stack.Screen name="HomeScreen" component={HomeScreen} />
 
-        <Stack.Screen name="HomeScreen" component={BottomTab} /> 
+        <Stack.Screen name="ProfileScreen" component={BottomTab} /> 
       </Stack.Navigator>
     </NavigationContainer>
   );

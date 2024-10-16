@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ImageBackground, Alert, ActivityIndicator } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import auth from '@react-native-firebase/auth';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 const LoginScreen = ({ navigation }) => {
   const [initializing, setInitializing] = useState(true);
@@ -9,49 +10,89 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const subscriber = auth().onAuthStateChanged((user) => {
       if (user) {
-        navigation.replace('HomeScreen');
+        // Optional: Handle user state if needed
       }
       if (initializing) setInitializing(false);
     });
     return subscriber; // Unsubscribe on unmount
   }, [initializing]);
 
-  if (initializing) return null;
+  // Initialize Google Sign-In
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: 'User', // Replace with your webClientId from Google Developers Console
+    });
+  }, []);
 
   const login = () => {
-    // Kiểm tra nếu trường nhập liệu trống
     if (!phoneOrEmail || !password) {
       setErrorMessage('Vui lòng nhập số điện thoại hoặc email và mật khẩu!');
       return;
     }
+    setLoading(true);
+    if (validateEmail(phoneOrEmail)) {
+      // Login with email and password
+      auth()
+        .signInWithEmailAndPassword(phoneOrEmail, password)
+        .then(() => {
+          console.log('User signed in!');
+          navigation.navigate('ProfileScreen'); // Chuyển đến ProfileScreen
+        })
+        .catch(handleFirebaseAuthError)
+        .finally(() => setLoading(false));
+    } else if (validatePhoneNumber(phoneOrEmail)) {
+      setErrorMessage('Đăng nhập bằng số điện thoại chưa được hỗ trợ trong demo này.');
+      setLoading(false);
+    } else {
+      setErrorMessage('Email hoặc số điện thoại không hợp lệ!');
+      setLoading(false);
+    }
+  };
 
-    // Đăng nhập
-    auth()
-      .signInWithEmailAndPassword(phoneOrEmail, password)
-      .then(() => {
-        console.log('User signed in!');
-        navigation.navigate('ProfileScreen');
-      })
-      .catch((error) => {
-        switch (error.code) {
-          case 'auth/invalid-email':
-            setErrorMessage('Email không hợp lệ!');
-            break;
-          case 'auth/wrong-password':
-            setErrorMessage('Mật khẩu không đúng!');
-            break;
-          case 'auth/user-not-found':
-            setErrorMessage('Tài khoản không tồn tại!');
-            break;
-          default:
-            setErrorMessage('Đăng nhập thất bại! Vui lòng thử lại.');
-            break;
-        }
-      });
+  const validateEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhoneNumber = (phone) => {
+    const phoneRegex = /^[0-9]{10,12}$/;
+    return phoneRegex.test(phone);
+  };
+
+  const handleFirebaseAuthError = (error) => {
+    switch (error.code) {
+      case 'auth/invalid-email':
+        setErrorMessage('Email không hợp lệ!');
+        break;
+      case 'auth/wrong-password':
+        setErrorMessage('Mật khẩu không đúng!');
+        break;
+      case 'auth/user-not-found':
+        setErrorMessage('Tài khoản không tồn tại!');
+        break;
+      default:
+        setErrorMessage('Đăng nhập thất bại! Vui lòng thử lại.');
+        break;
+    }
+  };
+
+  const googleLogin = async () => {
+    setLoading(true);
+    try {
+      const { idToken } = await GoogleSignin.signIn();
+      const googleCredential = auth.GoogleAuthProvider.credential(idToken);
+      await auth().signInWithCredential(googleCredential);
+      navigation.navigate('ProfileScreen'); // Chuyển đến ProfileScreen
+    } catch (error) {
+      setErrorMessage('Đăng nhập Google thất bại. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -95,21 +136,25 @@ const LoginScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
+        <TouchableOpacity onPress={() => navigation.navigate('ForgotPasswordScreen')}>
           <Text style={styles.forgotPasswordText}>QUÊN MẬT KHẨU</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.loginButton} onPress={login}>
-          <Text style={styles.loginButtonText}>ĐĂNG NHẬP</Text>
+        <TouchableOpacity style={styles.loginButton} onPress={login} disabled={loading}>
+          {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.loginButtonText}>ĐĂNG NHẬP</Text>}
         </TouchableOpacity>
 
         <View style={styles.separatorContainer}>
           <Text style={styles.separatorText}>HOẶC</Text>
         </View>
 
-        <TouchableOpacity style={styles.googleButton}>
-          <Icon name="google" size={20} color="#4285F4" />
-          <Text style={styles.googleButtonText}>Đăng nhập bằng Google</Text>
+        <TouchableOpacity style={styles.googleButton} onPress={googleLogin} disabled={loading}>
+          {loading ? <ActivityIndicator size="small" color="#4285F4" /> : (
+            <>
+              <Icon name="google" size={20} color="#4285F4" />
+              <Text style={styles.googleButtonText}>Đăng nhập bằng Google</Text>
+            </>
+          )}
         </TouchableOpacity>
 
         <View style={styles.footer}>
@@ -231,11 +276,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   footerText: {
-    color: '#000',
+    marginRight: 5,
   },
   signupText: {
     color: '#FF6347',
-    marginLeft: 5,
     fontWeight: 'bold',
   },
 });
