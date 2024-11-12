@@ -84,17 +84,17 @@ const DetailScreen = ({ route }) => {
     return (
         <View style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContainer}>
-                <Image source={{ uri: yard.Image }} style={styles.detailImage} />
+                <Image source={{ uri: yard.image }} style={styles.detailImage} />
 
                 <View style={styles.item}>
-                    <Text style={styles.detailName}>{yard.Name}</Text>
+                    <Text style={styles.detailName}>{yard.name}</Text>
 
                     <View style={styles.infoContainer}>
-                        <Text style={styles.detailAddress}>{yard.Address}</Text>
-                        <Text style={styles.detailStatus}>Đánh giá trung bình: {renderStars(yard.Average_rating)}</Text>
+                        <Text style={styles.detailAddress}>{yard.address}</Text>
+                        <Text style={styles.detailStatus}>Đánh giá trung bình: {renderStars(yard.average_rating)}</Text>
                     </View>
 
-                    <Text style={styles.detailRatingsCount}>Số lượt đánh giá: {yard.Ratings_count}</Text>
+                    <Text style={styles.detailRatingsCount}>Số lượt đánh giá: {yard.ratings_count}</Text>
 
                     {isFavorite && <Text style={styles.favoriteText}>Đã thêm vào yêu thích!</Text>}
                 </View>

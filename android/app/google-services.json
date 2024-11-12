@@ -1,65 +1,26 @@
 {
   "project_info": {
-    "project_number": "651667500159",
-    "project_id": "football-dc3c9",
-    "storage_bucket": "football-dc3c9.appspot.com"
+    "project_number": "996197416431",
+    "project_id": "sport-951d7",
+    "storage_bucket": "sport-951d7.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:651667500159:android:09c030ea42a796b29f234a",
-        "android_client_info": {
-          "package_name": "com.foba"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "651667500159-88stipasoflukh5u843bemub0rpvn1gc.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyBDUch53-UIcIKGPZqeJdZNbNAt3Lg-538"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "651667500159-88stipasoflukh5u843bemub0rpvn1gc.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:651667500159:android:ba2f20b8273700969f234a",
+        "mobilesdk_app_id": "1:996197416431:android:e2d9009ede25e0a03eca1a",
         "android_client_info": {
           "package_name": "com.sport"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "651667500159-88stipasoflukh5u843bemub0rpvn1gc.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBDUch53-UIcIKGPZqeJdZNbNAt3Lg-538"
+          "current_key": "AIzaSyDs3WI4bxuDHLtvL-vZV9eIcAmFLdF1dK0"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "651667500159-88stipasoflukh5u843bemub0rpvn1gc.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

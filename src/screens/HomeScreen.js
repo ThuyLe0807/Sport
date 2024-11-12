@@ -1,170 +1,147 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Linking, PermissionsAndroid } from 'react-native';
-import Section from '../components/Section'; 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  TextInput,
+} from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import Geolocation from 'react-native-geolocation-service';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import auth from '@react-native-firebase/auth';
 
 const HomeScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
-  const [yard, setYard] = useState([]);
+  const [yards, setYards] = useState([]);
+  const [favorites, setFavorites] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentLocation, setCurrentLocation] = useState(null); // To store the user's current location
 
   useEffect(() => {
-    // Request permission and get current location
-    const requestLocationPermission = async () => {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: "Location Permission",
-            message: "This app needs access to your location to find nearby yards.",
-            buttonNeutral: "Ask Me Later",
-            buttonNegative: "Cancel",
-            buttonPositive: "OK"
-          }
-        );
-        
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          Geolocation.getCurrentPosition(
-            (position) => {
-              const { latitude, longitude } = position.coords;
-              setCurrentLocation({ latitude, longitude });
-            },
-            (error) => {
-              console.log(error.code, error.message);
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-          );
-        } else {
-          console.log("Location permission denied");
-        }
-      } catch (err) {
-        console.warn(err);
+    const fetchFavorites = async () => {
+      const currentUser = auth().currentUser;
+      if (currentUser) {
+        const userId = currentUser.uid;
+        const favoriteSnapshot = await firestore()
+          .collection('FavoriteField')
+          .where('user_id', '==', userId)
+          .get();
+
+        const favoriteIds = favoriteSnapshot.docs.map(doc => doc.data().field_id);
+        setFavorites(favoriteIds); // Lưu các ID sân yêu thích
       }
     };
 
-    requestLocationPermission();
+    fetchFavorites();
 
     const subscriber = firestore()
       .collection('Yard')
-      .onSnapshot(
-        querySnapshot => {
-          if (querySnapshot && !querySnapshot.empty) {
-            const yards = [];
-            querySnapshot.forEach(documentSnapshot => {
-              yards.push({
-                ...documentSnapshot.data(),
-                key: documentSnapshot.id,
-              });
-            });
-            setYard(yards);
-          } else {
-            console.log('No yards found');
-          }
-          setLoading(false);
-        },
-        error => {
-          console.log('Error fetching data: ', error);
-          setLoading(false);
+      .onSnapshot(querySnapshot => {
+        if (querySnapshot && !querySnapshot.empty) {
+          const fetchedYards = querySnapshot.docs.map(doc => ({
+            ...doc.data(),
+            key: doc.id,
+          }));
+          setYards(fetchedYards);
+        } else {
+          console.log('No yards found');
         }
-      );
+        setLoading(false);
+      });
 
     return () => subscriber();
   }, []);
 
-  const handleView = (item) => {
-    navigation.navigate('DetailScreen', { yard: item });
-  };
+  const handleFavorite = async item => {
+    const currentUser = auth().currentUser;
+    if (!currentUser) {
+      console.log('No user is logged in.');
+      return;
+    }
 
-  const handleBook = (item) => {
-    navigation.navigate('BookingScreen', { yard: item });
-  };
-
-  const handleFavorite = async (item) => {
-    const updatedFavoriteStatus = !item.Favorite;
+    const userId = currentUser.uid;
+    const fieldId = item.key;
 
     try {
-      await firestore()
-        .collection('Yard')
-        .doc(item.key)
-        .update({ Favorite: updatedFavoriteStatus });
+      const favoriteSnapshot = await firestore()
+        .collection('FavoriteField')
+        .where('user_id', '==', userId)
+        .where('field_id', '==', fieldId)
+        .get();
 
-      setYard(prevYards =>
-        prevYards.map(yard =>
-          yard.key === item.key ? { ...yard, Favorite: updatedFavoriteStatus } : yard
-        )
-      );
+      if (favoriteSnapshot.empty) {
+        // Nếu sân chưa được yêu thích, thêm vào Firebase
+        await firestore().collection('FavoriteField').add({
+          user_id: userId,
+          field_id: fieldId,
+        });
+        setFavorites([...favorites, fieldId]); // Cập nhật danh sách yêu thích trong state
+      } else {
+        // Nếu sân đã có trong yêu thích, xóa khỏi Firebase
+        const docId = favoriteSnapshot.docs[0].id;
+        await firestore().collection('FavoriteField').doc(docId).delete();
+        setFavorites(favorites.filter(favId => favId !== fieldId)); // Cập nhật lại danh sách yêu thích
+      }
     } catch (error) {
       console.log('Error updating favorite status: ', error);
     }
   };
 
-  const handleNavigateToFavorite = () => {
-    navigation.navigate('FavoriteScreen');
+  const handleView = item => {
+    navigation.navigate('DetailScreen', { yard: item });
   };
-
-  const handleOpenMap = (Latitude, Longitude) => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${Latitude},${Longitude}`;
-    Linking.openURL(url);
+  const handleBook = item => {
+    navigation.navigate('BookingScreen', { yard: item });
   };
+  const filteredYards = yards.filter(yard =>
+    yard.name && yard.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loading) {
     return <ActivityIndicator size="large" color="#0000ff" />;
   }
 
-  const filteredYards = yard.filter(yard =>
-    yard.Name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Tìm kiếm sân..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        <TouchableOpacity onPress={handleNavigateToFavorite}>
-          <Icon name="heart" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
+      <TextInput
+        style={styles.searchInput}
+        placeholder="Tìm kiếm sân..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+      />
+      <FlatList
+        data={filteredYards}
+        renderItem={({ item }) => (
+          <View style={styles.itemContainer}>
+            <Image source={{ uri: item.image }} style={styles.image} />
+            <View style={styles.textContainer}>
+              <TouchableOpacity onPress={() => handleView(item)}>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.address}>{item.address}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.orderButton} onPress={() => handleBook(item)}>
+                <Text style={styles.detailButtonText}>Đặt sân</Text>
+              </TouchableOpacity>
+            </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Section>
-          {filteredYards.length > 0 ? (
-            <FlatList
-              data={filteredYards}
-              renderItem={({ item }) => (
-                <View style={styles.itemContainer}>
-                  <Image source={{ uri: item.Image }} style={styles.image} />
-                  <View style={styles.textContainer}>
-                    <TouchableOpacity style={styles.detailButton} onPress={() => handleView(item)}>
-                      <Text style={styles.name}>{item.Name}</Text>
-                      <TouchableOpacity onPress={() => handleOpenMap(item.Latitude, item.Longitude)}>
-                        <Text style={styles.address}>{item.Address}</Text>
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-
-                    {/* Nút Đặt Sân */}
-                    <TouchableOpacity style={styles.orderButton} onPress={() => handleBook(item)}>
-                      <Text style={styles.detailButtonText}>Đặt sân</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <TouchableOpacity style={styles.favoriteButton} onPress={() => handleFavorite(item)}>
-                    <Icon name="heart" size={24} color={item.Favorite ? 'red' : 'white'} />
-                  </TouchableOpacity>
-                </View>
-              )}
-              keyExtractor={item => item.key}
-            />
-          ) : (
-            <Text style={styles.noYardText}>Không có sân nào.</Text>
-          )}
-        </Section>
-      </ScrollView>
+            {/* Nút yêu thích */}
+            <TouchableOpacity
+              style={styles.favoriteButton}
+              onPress={() => handleFavorite(item)}
+            >
+              <Icon
+                name="heart"
+                size={24}
+                color={favorites.includes(item.key) ? 'red' : 'white'} // Màu icon thay đổi khi sân yêu thích
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+        keyExtractor={item => item.key}
+        ListEmptyComponent={<Text style={styles.noYardText}>Không có sân nào.</Text>}
+      />
     </View>
   );
 };
@@ -175,30 +152,21 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#49A65A',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
   searchInput: {
     height: 40,
     borderColor: '#ccc',
     borderWidth: 1,
     borderRadius: 5,
     paddingHorizontal: 10,
-    flex: 1,
-    marginRight: 10,
+    marginBottom: 20,
   },
   itemContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 10,
-    borderRadius: 5,
     backgroundColor: '#3A8948',
     padding: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginHorizontal: 5,
+    borderRadius: 5,
+    marginBottom: 10,
   },
   image: {
     width: 50,
@@ -212,23 +180,22 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#fff',
   },
   address: {
     fontSize: 14,
-    color: '#333',
-    textDecorationLine: 'underline', // Gạch chân
-    fontStyle: 'italic', // In nghiêng
+    color: '#ddd',
+    fontStyle: 'italic',
   },
   orderButton: {
     backgroundColor: '#FDF8B1',
     borderRadius: 5,
-    padding: 10,
+    padding: 5,
     marginTop: 5,
   },
   detailButtonText: {
     color: '#5314E6',
-    fontSize: 16,
+    fontSize: 14,
     textAlign: 'center',
   },
   favoriteButton: {
@@ -239,7 +206,8 @@ const styles = StyleSheet.create({
   noYardText: {
     textAlign: 'center',
     color: '#fff',
+    marginTop: 20,
   },
 });
 
-export default HomeScreen;   
+export default HomeScreen;

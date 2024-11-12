@@ -1,206 +1,155 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, TouchableOpacity, Linking, PermissionsAndroid } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import firestore from '@react-native-firebase/firestore';
-import Icon from 'react-native-vector-icons/FontAwesome';
-import Geolocation from 'react-native-geolocation-service';
+import auth from '@react-native-firebase/auth';
+import Icon from 'react-native-vector-icons/AntDesign'; // Import icon
 
-const FavoriteScreen = ({ navigation }) => { // Thêm navigation vào props
-    const [loading, setLoading] = useState(true);
-    const [favorites, setFavorites] = useState([]);
-    const [currentLocation, setCurrentLocation] = useState(null);
+const FavoriteScreen = () => {
+  const [loading, setLoading] = useState(true);
+  const [favoriteYards, setFavoriteYards] = useState([]);
 
-    useEffect(() => {
-        const requestLocationPermission = async () => {
-            try {
-                const granted = await PermissionsAndroid.request(
-                    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-                    {
-                        title: "Location Permission",
-                        message: "This app needs access to your location to find nearby yards.",
-                        buttonNeutral: "Ask Me Later",
-                        buttonNegative: "Cancel",
-                        buttonPositive: "OK"
-                    }
-                );
+  useEffect(() => {
+    const fetchFavoriteYards = async () => {
+      const currentUser = auth().currentUser;
+      if (!currentUser) {
+        console.log('No user is logged in.');
+        setLoading(false);
+        return;
+      }
 
-                if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-                    Geolocation.getCurrentPosition(
-                        (position) => {
-                            const { latitude, longitude } = position.coords;
-                            setCurrentLocation({ latitude, longitude });
-                        },
-                        (error) => {
-                            console.error("Error getting location: ", error.message);
-                        },
-                        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
-                    );
-                } else {
-                    console.log("Location permission denied");
-                }
-            } catch (err) {
-                console.warn(err);
-            }
-        };
+      const userId = currentUser.uid;
+      try {
+        // Lấy tất cả các sân yêu thích từ Firestore
+        const favoriteSnapshot = await firestore()
+          .collection('FavoriteField')
+          .where('user_id', '==', userId)
+          .get();
 
-        const unsubscribe = firestore()
+        if (!favoriteSnapshot.empty) {
+          const favoriteIds = favoriteSnapshot.docs.map(doc => doc.data().field_id);
+          
+          // Lấy thông tin chi tiết của các sân yêu thích từ collection Yard
+          const yardSnapshot = await firestore()
             .collection('Yard')
-            .where('Favorite', '==', true)
-            .onSnapshot(querySnapshot => {
-                const favoriteYards = [];
-                querySnapshot.forEach(documentSnapshot => {
-                    favoriteYards.push({
-                        ...documentSnapshot.data(),
-                        key: documentSnapshot.id,
-                    });
-                });
-                setFavorites(favoriteYards);
-                setLoading(false);
-            }, error => {
-                console.error('Error fetching favorite yards: ', error);
-                setLoading(false);
-            });
+            .where(firestore.FieldPath.documentId(), 'in', favoriteIds)
+            .get();
 
-        requestLocationPermission();
-
-        return () => unsubscribe(); // Hủy đăng ký khi component unmount
-    }, []);
-
-    const handleFavoriteToggle = async (item) => {
-        const updatedFavoriteStatus = !item.Favorite;
-
-        try {
-            await firestore()
-                .collection('Yard')
-                .doc(item.key)
-                .update({ Favorite: updatedFavoriteStatus });
-
-            setFavorites(prevFavorites =>
-                prevFavorites.map(favorite =>
-                    favorite.key === item.key ? { ...favorite, Favorite: updatedFavoriteStatus } : favorite
-                )
-            );
-        } catch (error) {
-            console.error('Error updating favorite status: ', error);
+          const yardsData = yardSnapshot.docs.map(doc => ({
+            ...doc.data(),
+            key: doc.id,
+          }));
+          setFavoriteYards(yardsData); // Cập nhật dữ liệu sân yêu thích
         }
+      } catch (error) {
+        console.log('Error fetching favorite yards: ', error);
+      }
+
+      setLoading(false);
     };
 
-    const handleView = (item) => {
-        navigation.navigate('DetailScreen', { yard: item });
-    };
+    fetchFavoriteYards();
+  }, []);
 
-    const handleOpenMap = (latitude, longitude) => {
-        const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
-        Linking.openURL(url);
-    };
+  const handleRemoveFavorite = async (yardId) => {
+    const currentUser = auth().currentUser;
+    if (!currentUser) return;
 
-    const handleBook = (item) => {
-        navigation.navigate('BookingScreen', { yard: item });
-      };
+    try {
+      // Xóa sân yêu thích khỏi Firestore
+      const favoriteRef = firestore()
+        .collection('FavoriteField')
+        .where('user_id', '==', currentUser.uid)
+        .where('field_id', '==', yardId);
 
-    if (loading) {
-        return <ActivityIndicator size="large" color="#0000ff" />;
+      const snapshot = await favoriteRef.get();
+      if (!snapshot.empty) {
+        // Nếu tìm thấy, xóa sân yêu thích
+        snapshot.forEach(doc => {
+          doc.ref.delete(); // Xóa tài liệu khỏi collection FavoriteField
+        });
+
+        // Cập nhật lại danh sách sân yêu thích trên UI
+        setFavoriteYards(prevState => prevState.filter(yard => yard.key !== yardId));
+      }
+    } catch (error) {
+      console.log('Error removing favorite yard: ', error);
     }
+  };
 
-    return (
-        <View style={styles.container}>
-            {favorites.length > 0 ? (
-                <FlatList
-                    data={favorites}
-                    renderItem={({ item }) => (
-                        <View style={styles.itemContainer}>
-                            <Image source={{ uri: item.Image }} style={styles.image} />
-                            <View style={styles.textContainer}>
-                                <TouchableOpacity style={styles.detailButton} onPress={() => handleView(item)}>
-                                    <Text style={styles.name}>{item.Name}</Text>
-                                    <TouchableOpacity onPress={() => handleOpenMap(item.Latitude, item.Longitude)}>
-                                        <Text style={styles.address}>{item.Address}</Text>
-                                    </TouchableOpacity>
-                                </TouchableOpacity>
+  if (loading) {
+    return <ActivityIndicator size="large" color="#0000ff" />;
+  }
 
-                                <TouchableOpacity style={styles.orderButton} onPress={() => handleBook(item)}>
-                                    <Text style={styles.detailButtonText}>Đặt sân</Text>
-                                </TouchableOpacity>
-                            </View>
+  return (
+    <View style={styles.container}>
+      {favoriteYards.length > 0 ? (
+        <FlatList
+          data={favoriteYards}
+          renderItem={({ item }) => (
+            <View style={styles.itemContainer}>
+              {item.image && <Image source={{ uri: item.image }} style={styles.image} />}
+              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.address}>{item.address}</Text>
 
-                            <TouchableOpacity
-                                style={styles.favoriteButton}
-                                onPress={() => handleFavoriteToggle(item)}
-                            >
-                                <Icon
-                                    name={item.Favorite ? "heart" : "heart-o"}
-                                    size={24}
-                                    color={item.Favorite ? 'red' : 'black'}
-                                />
-                            </TouchableOpacity>
-                        </View>
-                    )}
-                    keyExtractor={item => item.key}
-                />
-            ) : (
-                <Text style={styles.noYardText}>Không có sân yêu thích nào.</Text>
-            )}
-        </View>
-    );
+              {/* Nút xóa khỏi yêu thích */}
+              <TouchableOpacity
+                style={styles.favoriteButton}
+                onPress={() => handleRemoveFavorite(item.key)}
+              >
+                <Icon name="heart" size={24} color="red" />
+              </TouchableOpacity>
+            </View>
+          )}
+          keyExtractor={item => item.key}
+        />
+      ) : (
+        <Text style={styles.noFavoritesText}>Không có sân yêu thích nào.</Text>
+      )}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        padding: 20,
-        backgroundColor: '#49A65A',
-    },
-    itemContainer: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 10,
-        borderRadius: 5,
-        backgroundColor: '#3A8948',
-        padding: 10,
-        borderWidth: 1,
-        borderColor: '#ddd',
-        marginHorizontal: 5,
-        position: 'relative',
-    },
-    image: {
-        width: 50,
-        height: 50,
-        borderRadius: 5,
-        marginRight: 10,
-    },
-    textContainer: {
-        flex: 1,
-    },
-    name: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#000000',
-    },
-    address: {
-        fontSize: 14,
-        color: '#333',
-        textDecorationLine: 'underline', // Gạch chân
-        fontStyle: 'italic', // In nghiêng
-    },
-    orderButton: {
-        backgroundColor: '#FDF8B1',
-        borderRadius: 5,
-        padding: 10,
-        marginTop: 5,
-    },
-    detailButtonText: {
-        color: '#5314E6',
-        fontSize: 16,
-        textAlign: 'center',
-    },
-    favoriteButton: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
-    },
-    noYardText: {
-        textAlign: 'center',
-        color: '#fff',
-    },
+  container: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: '#f8f8f8',
+  },
+  itemContainer: {
+    backgroundColor: '#fff',
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 3,
+    position: 'relative',
+  },
+  name: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  address: {
+    fontSize: 14,
+    color: '#555',
+  },
+  image: {
+    width: '100%',
+    height: 200,
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+  },
+  noFavoritesText: {
+    textAlign: 'center',
+    color: '#555',
+    marginTop: 20,
+  },
 });
 
 export default FavoriteScreen;
